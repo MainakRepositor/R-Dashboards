@@ -1,0 +1,144 @@
+---
+title: "Titanic incident stats"
+author: "Mainak Chaudhuri"
+date: "05/12/2020"
+output: 
+  flexdashboard::flex_dashboard:
+    vertical_layout: scroll
+    theme: cosmo
+---
+
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(ggplot2)
+library(readr)
+library(highcharter)
+library(dplyr)
+
+train <- read_csv('train.csv')
+train$Pclass <- factor(train$Pclass, labels = c("1st", "2nd", "3rd"))
+train$Embarked <- factor(train$Embarked, labels = c("Cherbourg", "Queenstown", "Southhampton"))
+```
+
+Sample Layout 1 {data-orientation=rows data-icon="fa-bar-chart"}
+=====================================
+
+## Row 1 {data-height=110}
+
+### Passengers of the Titanic
+
+```{r}
+valueBox(2222, icon = "fa-ship", color="rgb(100,100,100)")
+```
+
+### Percentage of survivors
+
+```{r}
+valueBox("31.6 %", icon = "fa-heart", color="rgb(200,100,100)")
+```
+
+### Water temperature
+
+```{r}
+valueBox("-2°C", icon = "fa-life-ring",color="rgb(26,110,204)")
+```
+    
+
+## Row 2 {data-height=400}  
+
+### Passenger Age Density with respect to Gender
+    
+```{r}
+tmp_male <- train %>%  filter(Sex=="male", !is.na(Age)) %>% select(Age) %>% .[[1]]
+b <- hist(tmp_male, 80, plot=FALSE)
+tmp_female <- train %>%  filter(Sex=="female", !is.na(Age)) %>% select(Age) %>% .[[1]]
+a <- hist(tmp_female, breaks = b$breaks, plot=FALSE)
+
+df <- data.frame(Age=c(a$mids,b$mids),Density=c(a$density,b$density),Sex=c(rep("female",length(a$mids)),rep("male",length(b$mids))))
+
+highchart() %>% 
+  hc_add_series(name="female", select(filter(df,Sex=="female"),Density)[[1]], type="column", color='rgba(255, 192, 203, 0.30)', showInLegend=FALSE) %>% 
+  hc_add_series(name="male", select(filter(df,Sex=="male"),Density)[[1]], type="column", color='rgba(68, 170, 255, 0.30)', showInLegend=FALSE) %>% 
+  hc_add_series(name="male", select(filter(df,Sex=="male"),Density)[[1]], type="spline", color="#44AAFF") %>% 
+  hc_add_series(name="female", select(filter(df,Sex=="female"),Density)[[1]], type="spline", color="#FFC0Cb") %>% 
+hc_tooltip(pointFormat = "<span style=\"color:{series.color}\">{series.name}</span>:
+             {point.y:.3f}<br/>",
+             shared = FALSE) %>% 
+  hc_yAxis(title=list(text='Density')) %>% 
+  hc_xAxis(title=list(text='Age'))   
+
+```
+
+
+## Row 3 {data-height=400}  
+
+### Port of Embarkation Counts
+
+```{r}
+tmp <- train %>% filter(!(Embarked=="")) %>% group_by(Embarked) %>% tally() %>% mutate(Percent = n/sum(n))
+tmp$colors <- c("#0b7d0f", "#e81f10", "#3b14c9")
+tmp <- arrange(tmp,desc(Percent))
+highchart() %>% 
+  hc_xAxis(categories = c("Southhampton", "Cherbourg", "Queenstown")) %>%
+  hc_yAxis(title=list(text='Percentage')) %>%
+  hc_add_series(tmp, "bar", hcaes(x = Embarked, y = Percent, color=colors)) %>% 
+  hc_tooltip(pointFormat = "{point.y:.2f}</br>",shared = FALSE) %>% 
+  hc_legend(enabled=FALSE)
+```   
+
+### Passenger Class vs Survival Ratio
+    
+```{r}
+tmp <- train %>%  group_by(Pclass) %>% summarize(Survived = mean(Survived))
+tmp$colors <- c("#1766e6", "#e615d8", "#e00d6c")
+hchart(tmp, "column", hcaes(x = Pclass, y = Survived, color=colors)) %>% 
+    hc_tooltip(pointFormat = "{point.y:.2f}</br>",shared = FALSE)
+```
+
+
+Sample Layout 2 {data-icon="fa-area-chart"}
+=====================================  
+
+
+Column {data-width=450}
+-------------------------------------
+
+### Ship Payload %
+
+```{r}
+rate <- 95
+gauge(rate, min = 0, max = 100, symbol = '%', gaugeSectors(
+  success = c(80, 100), warning = c(40, 79), danger = c(0, 39)
+))
+```
+
+
+    
+### Sex
+    
+```{r}
+tmp <- train %>% group_by(Sex) %>% tally() %>% mutate(pct = n/sum(n))
+tmp$colors <- c("#d35400", "#2980b9")
+
+hchart(tmp, "pie", hcaes(x = Sex, y = pct, color=colors))
+```
+   
+Column {data-width=450}
+-------------------------------------
+
+### Parched passengers 
+
+```{r}
+gauge(23, min = 0, max = 100,symbol = '%', gaugeSectors(
+  success = c(65, 75), warning = c(30, 64), danger = c(0, 29)
+))
+```
+
+### Port of Embarkation vs Survival Ratio
+
+```{r}
+tmp <- train %>% filter(!(Embarked=="")) %>% group_by(Embarked) %>% summarize(Survived = mean(Survived))
+tmp$colors <- c("#d35400", "#2980b9", "#2ecc71")
+hchart(tmp, "column", hcaes(x = Embarked, y = Survived, color=colors))
+```   
